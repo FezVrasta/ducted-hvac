@@ -9,9 +9,8 @@ A Home Assistant custom integration for zoned ducted HVAC systems. Manages N zon
 - Central motor synchronisation: mode and temperature derived from all active zones (cool takes priority over heat)
 - Motor turns off automatically when all vents are closed
 - Coordinator status sensor showing open/closed zones, active mode, and motor target temperature
-- Multi-step UI wizard for initial setup (no YAML required)
+- Multi-step UI wizard for initial setup
 - Options flow to edit global settings and manage zones after setup
-- YAML backward compatibility with automatic import into a config entry
 - State restoration across HA restarts
 
 ## Installation
@@ -40,31 +39,6 @@ The setup wizard guides you through:
 2. **Zone configuration** — for each zone: a display name, vent switch entity, and temperature sensor entity
 3. Repeat zone step as many times as needed, then finish
 
-### YAML (Legacy)
-
-Existing YAML configs are automatically imported as a config entry on the first restart:
-
-```yaml
-ducted_hvac:
-  motor: climate.my_central_unit
-  modes:
-    - "off"
-    - heat
-    - cool
-    - fan_only
-  zones:
-    - name: "Living Room"
-      unique_id: living_room
-      vent: switch.vent_living_room
-      sensor: sensor.temperature_living_room
-    - name: "Bedroom"
-      unique_id: bedroom
-      vent: switch.vent_bedroom
-      sensor: sensor.temperature_bedroom
-```
-
-Once imported you can remove the YAML block and manage everything from the UI.
-
 ## Configuration Options
 
 ### Global
@@ -84,7 +58,6 @@ Once imported you can remove the YAML block and manage everything from the UI.
 | Option | Type | Description |
 |--------|------|-------------|
 | `name` | string | Display name of the zone |
-| `unique_id` | string | Stable identifier used by the entity registry |
 | `vent` | string | Entity ID of the vent switch |
 | `sensor` | string | Entity ID of the temperature sensor |
 
