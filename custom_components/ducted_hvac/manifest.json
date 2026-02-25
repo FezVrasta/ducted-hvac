@@ -1,0 +1,10 @@
+{
+  "domain": "ducted_hvac",
+  "name": "Ducted HVAC",
+  "config_flow": true,
+  "codeowners": [],
+  "documentation": "",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "2.0.0"
+}
