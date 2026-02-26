@@ -21,11 +21,11 @@ A Home Assistant custom integration for zoned ducted HVAC systems. Manages N zon
 
 ### HACS (Recommended)
 
-1. Open HACS in Home Assistant
-2. Click the three dots menu and select "Custom repositories"
-3. Add this repository URL and select "Integration" as the category
-4. Search for "Ducted HVAC" and install
-5. Restart Home Assistant
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FezVrasta&repository=ducted-hvac&category=integration)
+
+1. Click the button above, or manually add this repository in HACS under "Custom repositories" with category **Integration**
+2. Search for "Ducted HVAC" and install
+3. Restart Home Assistant
 
 ### Manual
 
