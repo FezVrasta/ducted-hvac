@@ -1,3 +1,7 @@
+<center>
+  <img src="./logo.png" alt="Ducted HVAC Logo" width="200">
+</center>
+
 # Ducted HVAC
 
 A Home Assistant custom integration for zoned ducted HVAC systems. Manages N zone climate entities tied to a single central motor unit, with automatic vent control, motor synchronisation, and a built-in UI wizard for setup.
@@ -43,22 +47,22 @@ The setup wizard guides you through:
 
 ### Global
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `motor` | string | **required** | Entity ID of the central motor climate entity |
-| `modes` | list | `["off", "heat", "cool", "fan_only", "dry"]` | HVAC modes to expose on zone thermostats |
-| `min_temp` | float | `16.0` | Minimum setpoint temperature |
-| `max_temp` | float | `30.0` | Maximum setpoint temperature |
-| `temp_step` | float | `0.5` | Temperature adjustment step |
-| `tolerance` | float | `0.3` | Dead-band around target temperature (°) |
-| `min_cycle_duration` | int | `0` | Minimum seconds between vent state changes (0 = disabled) |
+| Option               | Type   | Default                                      | Description                                               |
+| -------------------- | ------ | -------------------------------------------- | --------------------------------------------------------- |
+| `motor`              | string | **required**                                 | Entity ID of the central motor climate entity             |
+| `modes`              | list   | `["off", "heat", "cool", "fan_only", "dry"]` | HVAC modes to expose on zone thermostats                  |
+| `min_temp`           | float  | `16.0`                                       | Minimum setpoint temperature                              |
+| `max_temp`           | float  | `30.0`                                       | Maximum setpoint temperature                              |
+| `temp_step`          | float  | `0.5`                                        | Temperature adjustment step                               |
+| `tolerance`          | float  | `0.3`                                        | Dead-band around target temperature (°)                   |
+| `min_cycle_duration` | int    | `0`                                          | Minimum seconds between vent state changes (0 = disabled) |
 
 ### Per Zone
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | string | Display name of the zone |
-| `vent` | string | Entity ID of the vent switch |
+| Option   | Type   | Description                         |
+| -------- | ------ | ----------------------------------- |
+| `name`   | string | Display name of the zone            |
+| `vent`   | string | Entity ID of the vent switch        |
 | `sensor` | string | Entity ID of the temperature sensor |
 
 ## Entities Created
