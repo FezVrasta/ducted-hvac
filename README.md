@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./logo.png" alt="Ducted HVAC Logo" width="200">
+  <img src="./logo.png" alt="Ducted HVAC Logo" width="300">
 </p>
 
 # Ducted HVAC
@@ -98,4 +98,5 @@ After any vent state change the coordinator decides the motor state:
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
+
 
