@@ -336,6 +336,7 @@ class DuctedHVACOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._entry = config_entry
+        self._editing_zone_uid: str | None = None
 
     # ------------------------------------------------------------------
     # Entry point — show menu
@@ -346,7 +347,7 @@ class DuctedHVACOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         return self.async_show_menu(
             step_id="init",
-            menu_options=["global_settings", "add_zone", "delete_zone"],
+            menu_options=["global_settings", "add_zone", "edit_zone", "delete_zone"],
         )
 
     # ------------------------------------------------------------------
@@ -424,6 +425,86 @@ class DuctedHVACOptionsFlow(config_entries.OptionsFlow):
             step_id="add_zone",
             data_schema=_zone_schema({}),
             errors=errors,
+        )
+
+    # ------------------------------------------------------------------
+    # Edit a zone — step 1: pick which zone
+    # ------------------------------------------------------------------
+
+    async def async_step_edit_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        zones: list[dict] = list(self._entry.data.get(CONF_ZONES, []))
+
+        if not zones:
+            return self.async_abort(reason="no_zones_to_edit")
+
+        if user_input is not None:
+            self._editing_zone_uid = user_input["zone_uid"]
+            return await self.async_step_edit_zone_form()
+
+        zone_options = [{"value": z["unique_id"], "label": z[CONF_NAME]} for z in zones]
+        return self.async_show_form(
+            step_id="edit_zone",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("zone_uid"): SelectSelector(
+                        SelectSelectorConfig(options=zone_options, mode=SelectSelectorMode.LIST)
+                    )
+                }
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Edit a zone — step 2: edit fields
+    # ------------------------------------------------------------------
+
+    async def async_step_edit_zone_form(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        current = self._entry.data
+        zones: list[dict] = list(current.get(CONF_ZONES, []))
+        zone = next((z for z in zones if z["unique_id"] == self._editing_zone_uid), None)
+
+        if zone is None:
+            return self.async_abort(reason="zone_not_found")
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            name = user_input.get(CONF_NAME, "").strip()
+            if not name:
+                errors[CONF_NAME] = "zone_name_required"
+            else:
+                # Check slug collision against all other zones (not the one being edited)
+                other_uids = [z["unique_id"] for z in zones if z["unique_id"] != self._editing_zone_uid]
+                if _slug(name) in other_uids:
+                    errors[CONF_NAME] = "zone_name_duplicate"
+
+            if not errors:
+                updated_zone = {
+                    CONF_NAME: name,
+                    "unique_id": self._editing_zone_uid,  # preserve original uid
+                    CONF_VENT: user_input[CONF_VENT],
+                    CONF_SENSOR: user_input[CONF_SENSOR],
+                }
+                updated_zones = [
+                    updated_zone if z["unique_id"] == self._editing_zone_uid else z
+                    for z in zones
+                ]
+                self.hass.config_entries.async_update_entry(
+                    self._entry, data={**current, CONF_ZONES: updated_zones}
+                )
+                self.hass.async_create_task(
+                    self.hass.config_entries.async_reload(self._entry.entry_id)
+                )
+                return self.async_create_entry(title="", data={})
+
+        return self.async_show_form(
+            step_id="edit_zone_form",
+            data_schema=_zone_schema(zone),
+            errors=errors,
+            description_placeholders={"zone_name": zone[CONF_NAME]},
         )
 
     # ------------------------------------------------------------------

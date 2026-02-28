@@ -55,6 +55,7 @@
         "menu_options": {
           "global_settings": "Edit global settings",
           "add_zone": "Add a zone",
+          "edit_zone": "Edit a zone",
           "delete_zone": "Remove a zone"
         }
       },
@@ -80,6 +81,21 @@
           "sensor": "Temperature Sensor Entity"
         }
       },
+      "edit_zone": {
+        "title": "Edit Zone — Select",
+        "description": "Choose which zone to edit.",
+        "data": {
+          "zone_uid": "Zone"
+        }
+      },
+      "edit_zone_form": {
+        "title": "Edit Zone — {zone_name}",
+        "data": {
+          "name": "Zone Name",
+          "vent": "Vent Switch Entity",
+          "sensor": "Temperature Sensor Entity"
+        }
+      },
       "delete_zone": {
         "title": "Remove Zone",
         "description": "Select the zone to remove. Its entities will be deleted on reload.",
@@ -96,7 +112,9 @@
       "zone_not_found": "Selected zone not found."
     },
     "abort": {
-      "no_zones_to_delete": "No zones configured."
+      "no_zones_to_delete": "No zones configured.",
+      "no_zones_to_edit": "No zones configured.",
+      "zone_not_found": "Zone not found."
     }
   }
 }
