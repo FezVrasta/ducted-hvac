@@ -16,6 +16,7 @@ from . import DOMAIN, MotorCoordinator, build_device_info
 _LOGGER = logging.getLogger(__name__)
 
 ATTR_ACTIVE_MODE = "active_mode"
+ATTR_ACTIVE_FAN_MODE = "active_fan_mode"
 ATTR_MOTOR_TARGET_TEMP = "motor_target_temperature"
 ATTR_OPEN_ZONES = "open_zones"
 ATTR_CLOSED_ZONES = "closed_zones"
@@ -78,6 +79,7 @@ class MotorCoordinatorSensor(SensorEntity):
         zones = self._coordinator.zones
         return {
             ATTR_ACTIVE_MODE: self._coordinator.last_active_mode,
+            ATTR_ACTIVE_FAN_MODE: self._coordinator.last_fan_mode,
             ATTR_MOTOR_TARGET_TEMP: self._coordinator.last_motor_temp,
             ATTR_OPEN_ZONES: [z.name for z in zones if z.vent_is_open],
             ATTR_CLOSED_ZONES: [z.name for z in zones if not z.vent_is_open],

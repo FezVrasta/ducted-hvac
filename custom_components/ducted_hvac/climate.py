@@ -22,6 +22,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
 from . import (
+    CONF_FAN_MODES,
     CONF_MAX_TEMP,
     CONF_MIN_CYCLE_DURATION,
     CONF_MIN_TEMP,
@@ -72,6 +73,7 @@ async def async_setup_entry(
     tolerance: float = cfg["tolerance"]
     mcd_seconds = cfg.get("min_cycle_duration") or 0
     min_cycle_duration = timedelta(seconds=mcd_seconds) if mcd_seconds else None
+    fan_modes: list[str] = domain_data.get("fan_modes") or []
     device_info = build_device_info(entry)
 
     entities = []
@@ -84,6 +86,7 @@ async def async_setup_entry(
             sensor_entity_id=zone_cfg[CONF_SENSOR],
             coordinator=coordinator,
             modes=modes,
+            fan_modes=fan_modes,
             min_temp=min_temp,
             max_temp=max_temp,
             temp_step=temp_step,
@@ -157,6 +160,7 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         sensor_entity_id: str,
         coordinator: MotorCoordinator,
         modes: list[HVACMode],
+        fan_modes: list[str],
         min_temp: float,
         max_temp: float,
         temp_step: float,
@@ -188,6 +192,15 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         self._attr_supported_features = ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
         if has_temp_mode:
             self._attr_supported_features |= ClimateEntityFeature.TARGET_TEMPERATURE
+
+        # Fan mode support (optional — empty list disables the feature)
+        if fan_modes:
+            self._attr_fan_modes = fan_modes
+            self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
+            self._fan_mode: str | None = fan_modes[0]
+        else:
+            self._attr_fan_modes = []
+            self._fan_mode = None
 
         # Internal state
         self._hvac_mode: HVACMode = HVACMode.OFF
@@ -223,6 +236,10 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
     @property
     def target_temperature(self) -> float | None:
         return self._target_temp
+
+    @property
+    def fan_mode(self) -> str | None:
+        return self._fan_mode
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -273,6 +290,10 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
                     self._last_vent_toggle = dt_util.parse_datetime(ts)
                 except (TypeError, ValueError):
                     pass
+
+            if self._fan_mode is not None:
+                if (fm := attrs.get("fan_mode")) and fm in (self._attr_fan_modes or []):
+                    self._fan_mode = fm
 
         # 2. Read current sensor value
         self._update_current_temp()
@@ -332,6 +353,20 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         # Handle combined hvac_mode + temperature calls
         if hvac_mode := kwargs.get("hvac_mode"):
             await self.async_set_hvac_mode(HVACMode(hvac_mode))
+
+    async def async_set_fan_mode(self, fan_mode: str) -> None:
+        """Set fan mode and notify the coordinator (last-set wins)."""
+        if fan_mode not in (self._attr_fan_modes or []):
+            _LOGGER.warning(
+                "%s: fan mode %s not in configured fan modes %s",
+                self.name,
+                fan_mode,
+                self._attr_fan_modes,
+            )
+            return
+        self._fan_mode = fan_mode
+        self.async_write_ha_state()
+        self._coordinator.async_fan_mode_changed(fan_mode)
 
     async def async_turn_on(self) -> None:
         """Turn on: restore to last non-off mode, or cool as default."""

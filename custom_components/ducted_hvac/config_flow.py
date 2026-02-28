@@ -25,6 +25,7 @@ from homeassistant.helpers.selector import (
 )
 
 from . import (
+    CONF_FAN_MODES,
     CONF_MAX_TEMP,
     CONF_MIN_CYCLE_DURATION,
     CONF_MIN_TEMP,
@@ -36,6 +37,7 @@ from . import (
     CONF_TOLERANCE,
     CONF_VENT,
     CONF_ZONES,
+    DEFAULT_FAN_MODES,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
     DEFAULT_TEMP_STEP,
@@ -51,6 +53,15 @@ _MODE_LABELS = {
     "cool": "Cool",
     "fan_only": "Fan only",
     "dry": "Dry",
+}
+
+_SELECTABLE_FAN_MODES = ["auto", "low", "medium", "high", "turbo"]
+_FAN_MODE_LABELS = {
+    "auto": "Auto",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "turbo": "Turbo",
 }
 
 
@@ -74,6 +85,16 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
             ): SelectSelector(
                 SelectSelectorConfig(
                     options=[{"value": m, "label": _MODE_LABELS[m]} for m in _SELECTABLE_MODES],
+                    multiple=True,
+                    mode=SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Optional(
+                CONF_FAN_MODES,
+                default=defaults.get(CONF_FAN_MODES, DEFAULT_FAN_MODES),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=[{"value": m, "label": _FAN_MODE_LABELS[m]} for m in _SELECTABLE_FAN_MODES],
                     multiple=True,
                     mode=SelectSelectorMode.LIST,
                 )
@@ -357,6 +378,7 @@ class DuctedHVACOptionsFlow(config_entries.OptionsFlow):
             CONF_NAME: current.get(CONF_NAME, ""),
             CONF_MOTOR: current.get(CONF_MOTOR, ""),
             CONF_MODES: current_modes,
+            CONF_FAN_MODES: current.get(CONF_FAN_MODES, DEFAULT_FAN_MODES),
             CONF_MIN_TEMP: current.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP),
             CONF_MAX_TEMP: current.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP),
             CONF_TEMP_STEP: current.get(CONF_TEMP_STEP, DEFAULT_TEMP_STEP),

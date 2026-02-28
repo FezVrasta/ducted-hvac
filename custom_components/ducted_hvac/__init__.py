@@ -35,11 +35,14 @@ CONF_MAX_TEMP = "max_temp"
 CONF_TEMP_STEP = "temp_step"
 CONF_TOLERANCE = "tolerance"
 CONF_MIN_CYCLE_DURATION = "min_cycle_duration"
+CONF_FAN_MODES = "fan_modes"
 
 DEFAULT_MIN_TEMP = 16.0
 DEFAULT_MAX_TEMP = 30.0
 DEFAULT_TEMP_STEP = 0.5
 DEFAULT_TOLERANCE = 0.3
+DEFAULT_FAN_MODES = ["auto", "low", "medium", "high"]
+
 DEFAULT_MODES = [
     HVACMode.OFF,
     HVACMode.HEAT,
@@ -89,6 +92,9 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_TEMP_STEP, default=DEFAULT_TEMP_STEP): vol.Coerce(float),
                 vol.Optional(CONF_TOLERANCE, default=DEFAULT_TOLERANCE): vol.Coerce(float),
                 vol.Optional(CONF_MIN_CYCLE_DURATION): cv.time_period,
+                vol.Optional(CONF_FAN_MODES, default=DEFAULT_FAN_MODES): vol.All(
+                    cv.ensure_list, [cv.string]
+                ),
             }
         )
     },
@@ -144,6 +150,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         CONF_TEMP_STEP: domain_config[CONF_TEMP_STEP],
         CONF_TOLERANCE: domain_config[CONF_TOLERANCE],
         CONF_MIN_CYCLE_DURATION: mcd_seconds,
+        CONF_FAN_MODES: domain_config.get(CONF_FAN_MODES, DEFAULT_FAN_MODES),
     }
 
     hass.async_create_task(
@@ -166,10 +173,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     coordinator = MotorCoordinator(hass, data[CONF_MOTOR])
 
+    fan_modes: list[str] = data.get(CONF_FAN_MODES, [])
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "coordinator": coordinator,
         "config": data,
         "modes": modes,
+        "fan_modes": fan_modes,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -201,6 +211,7 @@ class MotorCoordinator:
         # State tracked for coordinator sensor
         self._last_active_mode: str | None = None
         self._last_motor_temp: float | None = None
+        self._last_fan_mode: str | None = None  # last fan mode set by any zone
         self._sensor = None  # MotorCoordinatorSensor, injected via register_sensor()
 
     @property
@@ -218,6 +229,11 @@ class MotorCoordinator:
         """Temperature last commanded to the motor, or None."""
         return self._last_motor_temp
 
+    @property
+    def last_fan_mode(self) -> str | None:
+        """Fan mode last commanded to the motor, or None."""
+        return self._last_fan_mode
+
     def register_zone(self, zone) -> None:
         """Register a zone. Called by each DuctedHVACZone in async_added_to_hass."""
         self._zones.append(zone)
@@ -225,6 +241,12 @@ class MotorCoordinator:
     def register_sensor(self, sensor) -> None:
         """Register the coordinator status sensor for push notifications."""
         self._sensor = sensor
+
+    @callback
+    def async_fan_mode_changed(self, fan_mode: str) -> None:
+        """Record the latest fan mode and schedule a motor sync."""
+        self._last_fan_mode = fan_mode
+        self.async_zone_changed()
 
     @callback
     def async_zone_changed(self) -> None:
@@ -311,6 +333,21 @@ class MotorCoordinator:
                     "Failed to set motor %s temperature to %s",
                     self._motor_entity_id,
                     target_temp,
+                )
+
+        if self._last_fan_mode is not None:
+            try:
+                await self._hass.services.async_call(
+                    "climate",
+                    "set_fan_mode",
+                    {"entity_id": self._motor_entity_id, "fan_mode": self._last_fan_mode},
+                    blocking=True,
+                )
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception(
+                    "Failed to set motor %s fan mode to %s",
+                    self._motor_entity_id,
+                    self._last_fan_mode,
                 )
 
         self._notify_sensor()
