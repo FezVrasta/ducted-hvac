@@ -289,17 +289,21 @@ class MotorCoordinator:
             HVACMode.FAN_ONLY,
         )
 
-        # Determine temperature setpoint from open zones with temp-controlled modes
-        open_temps = [
+        # Determine temperature setpoint from ALL active (non-OFF) zones in temp-controlled modes.
+        # We intentionally use self._zones (not open_zones) so the motor temperature reflects
+        # all zone targets, not just zones whose vents happen to be open right now. A vent only
+        # opens once the room deviates beyond the hysteresis tolerance, so if we only looked at
+        # open zones the motor would never receive a setpoint when rooms are near their target.
+        all_active_temps = [
             z.target_temperature
-            for z in open_zones
+            for z in self._zones
             if z.target_temperature is not None and z.hvac_mode in TEMP_CONTROLLED_MODES
         ]
 
         if target_mode == HVACMode.COOL:
-            target_temp = min(open_temps) if open_temps else None
+            target_temp = min(all_active_temps) if all_active_temps else None
         elif target_mode == HVACMode.HEAT:
-            target_temp = max(open_temps) if open_temps else None
+            target_temp = max(all_active_temps) if all_active_temps else None
         else:
             target_temp = None
 
