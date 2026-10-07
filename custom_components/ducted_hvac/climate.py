@@ -212,6 +212,7 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         # Listener unsubscribe handles
         self._unsub_sensor = None
         self._unsub_startup = None
+        self._unsub_vent = None
 
     # ------------------------------------------------------------------
     # ClimateEntity properties
@@ -295,6 +296,12 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
                 if (fm := attrs.get("fan_mode")) and fm in (self._attr_fan_modes or []):
                     self._fan_mode = fm
 
+        # 1b. Reconcile vent state from the physical switch entity so external
+        # or manual changes cannot leave the model desynced.
+        vent_state = self.hass.states.get(self._vent_entity_id)
+        if vent_state is not None and vent_state.state in ("on", "off"):
+            self._vent_open = vent_state.state == "on"
+
         # 2. Read current sensor value
         self._update_current_temp()
 
@@ -306,6 +313,13 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
             self.hass,
             [self._sensor_entity_id],
             self._async_sensor_changed,
+        )
+
+        # 4b. Track the actual vent switch state (self-healing reconciliation)
+        self._unsub_vent = async_track_state_change_event(
+            self.hass,
+            [self._vent_entity_id],
+            self._async_vent_state_changed,
         )
 
         # 5. Defer initial vent evaluation until HA is fully started
@@ -322,6 +336,9 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         if self._unsub_startup:
             self._unsub_startup()
             self._unsub_startup = None
+        if self._unsub_vent:
+            self._unsub_vent()
+            self._unsub_vent = None
 
     # ------------------------------------------------------------------
     # Service handlers
@@ -420,6 +437,24 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
 
         self.async_write_ha_state()
         self.hass.async_create_task(self._async_control_vent())
+
+    @callback
+    def _async_vent_state_changed(self, event) -> None:
+        """Keep the model synced with the actual vent switch state.
+
+        Changes to the switch that do not originate from this entity (manual
+        flip, another automation, restore mismatch) update ``_vent_open`` and
+        re-trigger the coordinator, so motor decisions reflect physical reality
+        instead of a cached flag.
+        """
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state not in ("on", "off"):
+            return
+        actual = new_state.state == "on"
+        if actual != self._vent_open:
+            self._vent_open = actual
+            self.async_write_ha_state()
+            self._coordinator.async_zone_changed()
 
     @callback
     def _async_startup_check(self, _event=None) -> None:

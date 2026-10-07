@@ -265,8 +265,9 @@ class MotorCoordinator:
         await asyncio.sleep(0)
 
         open_zones = [z for z in self._zones if z.vent_is_open]
+        driving_zones = [z for z in open_zones if z.hvac_mode in MODE_PRIORITY]
 
-        if not open_zones:
+        if not driving_zones:
             # All vents closed — turn off the motor
             self._last_active_mode = None
             self._last_motor_temp = None
@@ -283,7 +284,7 @@ class MotorCoordinator:
             return
 
         # Determine the winning mode by priority
-        open_modes = {z.hvac_mode for z in open_zones}
+        open_modes = {z.hvac_mode for z in driving_zones}
         target_mode = next(
             (m for m in MODE_PRIORITY if m in open_modes),
             HVACMode.FAN_ONLY,
