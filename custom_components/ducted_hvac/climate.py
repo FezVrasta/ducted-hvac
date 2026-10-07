@@ -16,7 +16,10 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+)
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
@@ -212,6 +215,7 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         # Listener unsubscribe handles
         self._unsub_sensor = None
         self._unsub_startup = None
+        self._unsub_retry = None
 
     # ------------------------------------------------------------------
     # ClimateEntity properties
@@ -322,6 +326,9 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
         if self._unsub_startup:
             self._unsub_startup()
             self._unsub_startup = None
+        if self._unsub_retry:
+            self._unsub_retry()
+            self._unsub_retry = None
 
     # ------------------------------------------------------------------
     # Service handlers
@@ -485,12 +492,27 @@ class DuctedHVACZone(ClimateEntity, RestoreEntity):
 
         if not self._is_min_cycle_respected(desired):
             _LOGGER.debug(
-                "%s: min_cycle_duration not yet elapsed, skipping vent toggle",
+                "%s: min_cycle_duration not yet elapsed, deferring vent toggle",
                 self.name,
             )
+            if self._min_cycle_duration is not None and self._last_vent_toggle is not None:
+                remaining = (
+                    self._last_vent_toggle + self._min_cycle_duration - dt_util.utcnow()
+                ).total_seconds()
+                if self._unsub_retry:
+                    self._unsub_retry()
+                self._unsub_retry = async_call_later(
+                    self.hass, max(remaining, 1), self._async_retry_control
+                )
             return
 
         await self._async_set_vent(desired)
+
+    @callback
+    def _async_retry_control(self, _now=None) -> None:
+        """Re-evaluate the vent once a deferred min_cycle guard has elapsed."""
+        self._unsub_retry = None
+        self.hass.async_create_task(self._async_control_vent())
 
     async def _async_set_vent(self, open: bool) -> None:  # noqa: A002
         """Open or close the vent switch."""
