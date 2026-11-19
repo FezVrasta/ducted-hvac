@@ -207,6 +207,7 @@ class MotorCoordinator:
         self._motor_entity_id = motor_entity_id
         self._zones: list = []  # list[DuctedHVACZone], typed loosely to avoid circular import
         self._pending_sync: asyncio.Task | None = None
+        self._resync_pending: bool = False
 
         # State tracked for coordinator sensor
         self._last_active_mode: str | None = None
@@ -256,10 +257,24 @@ class MotorCoordinator:
         The pending task will pick up the latest zone state when it runs.
         """
         if self._pending_sync is not None and not self._pending_sync.done():
+            # Coalesce: remember that reality moved while a sync was in flight,
+            # and schedule one trailing re-run when it finishes.
+            self._resync_pending = True
             return
+        self._resync_pending = False
         self._pending_sync = self._hass.async_create_task(self._async_sync_motor())
 
     async def _async_sync_motor(self) -> None:
+        """Run a motor sync; coalesce any zone change that raced with it."""
+        try:
+            await self._async_sync_motor_inner()
+        finally:
+            self._pending_sync = None
+            if self._resync_pending:
+                self._resync_pending = False
+                self.async_zone_changed()
+
+    async def _async_sync_motor_inner(self) -> None:
         """Determine the correct motor state from all zones and apply it."""
         # Yield to let any in-flight async_write_ha_state calls complete
         await asyncio.sleep(0)
